@@ -1,0 +1,27 @@
+{
+    "version": "1",
+    "region": "us-west-2",
+    "userPoolId": "us-west-2_123456789",
+    "userName": "email@example.com",
+    "callerContext": {
+        "awsSdkVersion": "aws-sdk-unknown-unknown",
+        "clientId": "699mocktm88fvcdl3vek123456"
+    },
+    "triggerSource": "PreSignUp_SignUp",
+    "request": {
+        "userAttributes": {
+            "phone_number": "+17605555555",
+            "preferred_username": "email@example.com",
+            "given_name": "John",
+            "family_name": "Doe",
+            "email": "email@example.com",
+            "custom:tenant_id": "0bc9b220-5c32-11eb-90a0-23a75a152703"
+        },
+        "validationData": null
+    },
+    "response": {
+        "autoConfirmUser": false,
+        "autoVerifyEmail": false,
+        "autoVerifyPhone": false
+    }
+}

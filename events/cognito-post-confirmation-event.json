@@ -1,0 +1,25 @@
+{
+    "version": "1",
+    "region": "us-west-2",
+    "userPoolId": "us-west-2_CjlwOqfml",
+    "userName": "email@example.com",
+    "callerContext": {
+       "awsSdkVersion": "aws-sdk-unknown-unknown",
+       "clientId": "699mocktm88fvcdl3vek123456"
+    },
+    "triggerSource": "PostConfirmation_ConfirmSignUp",
+    "request": {
+       "userAttributes": {
+          "sub": "9adb660a-7f69-4c30-89f9-f9d3dcc8be25",
+          "cognito:user_status": "CONFIRMED",
+          "email_verified": "true",
+          "phone_number_verified": "false",
+          "phone_number": "+17605555555",
+          "preferred_username": "email@example.com",
+          "given_name": "Jane",
+          "family_name": "Doe",
+          "email": "email@example.com"
+       }
+    },
+    "response": {}
+ }

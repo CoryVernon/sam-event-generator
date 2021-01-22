@@ -1,0 +1,29 @@
+{
+  "name": "sam-event-generator",
+  "version": "1.0.0",
+  "description": "AWS event generator for testing",
+  "main": "generator.js",
+  "scripts": {
+    "test": "jest --roots tests -t"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/CoryVernon/sam-event-generator.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/CoryVernon/sam-event-generator/issues"
+  },
+  "homepage": "https://github.com/CoryVernon/sam-event-generator#readme",
+  "dependencies": {
+    "aws-sdk": "^2.830.0",
+    "jsonwebtoken": "^8.5.1",
+    "uuid": "^8.3.2"
+  },
+  "devDependencies": {
+    "dotenv": "^8.2.0",
+    "faker": "^5.1.0",
+    "jest": "^26.6.3"
+  }
+}
