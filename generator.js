@@ -1,49 +1,109 @@
 require('dotenv').config()
+const Amplify = require('aws-amplify');
 const AWS = require('aws-sdk');
+const jwt = require('jwt-decode');
 var dynamodb = null;    //  DynamoDB document client
-const jwt = require('jsonwebtoken');
+var config = {};
+var authToken = null;
 
-const getAuthToken = (tenant_id) => {
-    //  Assembel cognito token attributes
-    const attributes = {
-        sub: "968f9522-1403-47ff-90e0-e7f1a12b123a",
-        email_verified: true,
-        iss: "https://cognito-idp.us-west-2.amazonaws.com/us-west-2_123456789",
-        phone_number_verified: false,
-        'cognito:username': "email@example.com",
-        'custom:tenant_id': tenant_id,
-        preferred_username: "email@example.com",
-        given_name: "Test",
-        aud: "h58jovr2i1gtivlch12345678",
-        event_id: "9501770b-1562-4ece-8783-65b0ebc83ece",
-        token_use: "id",
-        auth_time: 1611093939,
-        phone_number: "+17605555555",
-        exp: 1611179633,
-        iat: 1611176033,
-        family_name: "User",
-        email: "email@example.com"
+const setCredentials = async (token) => {
+    try {
+        //  Deserialize the token
+        const tokenObj = jwt(token);
+
+        //  Get the cognito provider from the token (removing https:// prefix)
+        const provider = tokenObj.iss.replace('https://', '');
+
+        //  Instantiate the cognito Identity client
+        const client = new AWS.CognitoIdentity({ apiVersion: '2014-06-30', region: 'us-west-2' });
+
+        //  Assemble Identity params
+        const params = {
+            IdentityPoolId: 'us-west-2:ec0f9d5b-8f68-4359-9261-38f7738f05ce',
+            Logins: { [provider]: token }
+        }
+
+        //  Get the IdentityId from Cognito
+        const identity = await client.getId(params).promise();
+
+        //  Assemble Credentials parameters
+        const credParams = {
+            IdentityId: identity.IdentityId,
+            Logins: { [provider]: token }
+        }
+
+        //  Get Identity Credentials from Cognito
+        const creds = await client.getCredentialsForIdentity(credParams).promise();
+
+        //  Set aws sdk credentials
+        AWS.config.update({
+            region: 'us-west-2',
+            'accessKeyId': creds.AccessKeyId,
+            'secretAccessKey': creds.SecretKey
+        });
+    } catch (e) {
+        console.log('ERROR', e);
     }
+};
 
-    //  Encode the jwt
-    const token = jwt.sign(attributes, 'shhhh');
+const signin = async () => {
+    try {
+        //  If the auth token already exists, do nothing
+        if (authToken) return;
 
-    return `Bearer ${token}`;
-}
+        Amplify.default.configure({
+            authenticationFlowType: 'USER_PASSWORD_AUTH',
+            Auth: {
+                region: config.userPoolRegion,
+                userPoolId: config.userPoolId,
+                userPoolWebClientId: config.userPoolClientId,
+                oauth: {
+                    domain: config.userPoolDomain,
+                    scope: ['email', 'profile', 'openid', 'aws.cognito.signin.user.admin'],
+                    redirectSignIn: 'http://localhost:8080/dashboard',
+                    redirectSignOut: 'http://localhost:8080',
+                    responseType: "code"
+                }
+            }
+        });
+
+        //  Send the request to AWS Cognito
+        const user = await Amplify.Auth.signIn(config.userPoolUsername, config.userPoolPassword)
+
+        //  Get the authToken from the cognito user
+        const token = user.signInUserSession.idToken.jwtToken;
+
+        //  Set credentials for AWS sdk
+        await setCredentials(token);
+
+        //  Set the auth token
+        authToken = `Bearer ${token}`;
+
+        return;
+    } catch (e) {
+        console.log('ERROR', e);
+    }
+};
 
 const db = {
     async put(payload, options) {
-        console.log('DB', payload, options);
-        const params = { 
+        //  If dynamodb has NOT been initialize, throw error
+        if (!dynamodb) dynamodb = new AWS.DynamoDB.DocumentClient();
+
+        const params = {
             TableName: options.tableName,
             Item: payload
         }
+
         await dynamodb.put(params).promise();
     }
 }
 
 const generator = {
     async apiDeleteEvent(payload, options) {
+        //  Login the user
+        await signin();
+
         //  If database options exist, forward them to dynamodb
         if (options.tableName) await db.put(payload, options);
 
@@ -53,11 +113,14 @@ const generator = {
         //  Update the event
         event.httpMethod = 'DELETE';
         event.pathParameters.id = options.pathID;
-        event.headers.Authorization = getAuthToken(options.tenantID);
+        event.headers.Authorization = authToken;
 
         return event;
     },
     async apiGetEvent(payload, options) {
+        //  Login the user
+        await signin();
+
         //  If database options exist, forward them to dynamodb
         if (options.tableName) await db.put(payload, options);
 
@@ -67,33 +130,42 @@ const generator = {
         //  Update the event
         event.httpMethod = 'GET';
         event.pathParameters.id = options.pathID;
-        event.headers.Authorization = getAuthToken(options.tenantID);
+        event.headers.Authorization = authToken;
 
         return event;
     },
     async apiPageEvent(payload, options) {
+        //  Login the user
+        await signin();
+
         //  Fetch the generic api event
         const event = require('./events/api-gateway-event');
 
         //  Update the event
         event.httpMethod = 'GET';
         event.pathParameters.page = options.page;
-        event.headers.Authorization = getAuthToken(options.tenantID);
+        event.headers.Authorization = authToken;
 
         return event;
     },
     async apiPostEvent(payload) {
+        //  Login the user
+        await signin();
+
         //  Fetch the generic api event
         const event = require('./events/api-gateway-event');
 
         //  Update the event
         event.httpMethod = 'POST';
         event.body = JSON.stringify(payload);
-        event.headers.Authorization = getAuthToken(payload.tenant_id);
+        event.headers.Authorization = authToken;
 
         return event
     },
     async apiPutEvent(payload, options) {
+        //  Login the user
+        await signin();
+
         //  If database options exist, forward them to dynamodb
         if (options.tableName) await db.put(payload, options);
 
@@ -103,31 +175,29 @@ const generator = {
         //  Update the event
         event.httpMethod = 'PUT';
         event.body = JSON.stringify(payload);
-        event.headers.Authorization = getAuthToken(payload.tenant_id);
+        event.headers.Authorization = authToken;
 
         return event
     },
-    async cognitoPreSignUpEvent(payload) {
+    async cognitoPreSignUpEvent(user) {
         //  Get the generate cognito pre sign up event
         const event = require('./events/cognito-pre-signup-event.json');
 
-        //  Populate the event with the payload
-        for (const key of Object.keys(payload)) {
-            event.request.userAttributes[key] = payload[key];
+        //  If a payload exists, populate the event with the payload
+        if (user) {
+            for (const key of Object.keys(user)) {
+                event.request.userAttributes[key] = user[key];
+            }
         }
 
         return event;
     }
 }
 
-exports.init = (options) => {
-    AWS.config.update({
-        region: 'us-west-2',
-        'accessKeyId': options.clientID,
-        'secretAccessKey': options.clientSecret
-    });
+exports.init = async (options) => {
 
-    dynamodb = new AWS.DynamoDB.DocumentClient();
+    //  Update configuration
+    config = options;
 }
 
 exports.makeEvent = async (eventName, payload, options) => {

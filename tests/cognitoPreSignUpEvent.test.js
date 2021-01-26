@@ -1,6 +1,5 @@
 const generator = require('../generator.js');
 const faker = require('faker');
-const uuid = require('uuid');
 
 describe('cognitoPreSignUpEvent', function () {
     it('Verifies a POST event is created', async () => {
