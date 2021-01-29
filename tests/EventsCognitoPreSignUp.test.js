@@ -1,7 +1,7 @@
-const generator = require('../generator.js');
+const app = require('../src/app.js');
 const faker = require('faker');
 
-describe('cognitoPreSignUpEvent', function () {
+describe('EventsCognitoPreSignUpTest', function () {
     it('Verifies a POST event is created', async () => {
 
         const email = faker.internet.email();
@@ -17,7 +17,7 @@ describe('cognitoPreSignUpEvent', function () {
         }
 
         //  Get an API Event
-        const event = await generator.makeEvent('cognitoPreSignUpEvent', payload);
+        const event = await app.events.make('cognitoPreSignUpEvent', payload);
 
         //  Assert a the cognito trigger
         expect(event.triggerSource).toEqual('PreSignUp_SignUp');
